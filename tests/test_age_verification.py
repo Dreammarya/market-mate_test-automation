@@ -1,50 +1,57 @@
+# test_age_verification.py
 import pytest
+import time
+from datetime import datetime, timedelta
 from pages.login_page import LoginPage
-from pages.shop_page import ShopPage
+from pages.shopping_page import ShopPage
+from config import AUTH_URL, TEST_USER_CREDENTIALS, INVALID_DOB
 
 
-@pytest.mark.usefixtures("driver", "config")
-class TestAgeVerification:
+@pytest.mark.parametrize("birth_date, expected", [
+    # exactly 18 years old
+    ((datetime.now() - timedelta(days=18*365)).strftime("%d-%m-%Y"), "You are of age"),
+    # under 18
+    ((datetime.now() - timedelta(days=17*365)).strftime("%d-%m-%Y"), "You are underage"),
+    # older than 18
+    ((datetime.now() - timedelta(days=19*365)).strftime("%d-%m-%Y"), "You are of age"),
+])
+def test_age_verification(driver, birth_date, expected):
+    driver.get(AUTH_URL)
 
-    def test_blank_dob_shows_prompt(self, driver, config):
-        """
-        Submitting a blank DOB should trigger a toast and block access.
-        """
-        login = LoginPage(driver)
-        login.load()
-        login.login(config["email"], config["password"])
+    # login first
+    login_page = LoginPage(driver)
+    login_page.login(TEST_USER_CREDENTIALS["email"], TEST_USER_CREDENTIALS["password"])
 
-        shop = ShopPage(driver)
-        shop.load()
-        shop.handle_age_verification("")
+    # open shop modal and enter DOB
+    shopping_page = ShopPage(driver)
+    shopping_page.open_shop_modal()
+    shopping_page.handle_age_verification(birth_date)
 
-        assert shop.toast_message_displayed("underage") or shop.toast_message_displayed("birth")
+    # check toast result
+    assert expected in shopping_page.get_toast_message()
 
-    def test_underage_dob_shows_block_message(self, driver, config):
-        """
-        Entering an underage DOB should block access and show a toast.
-        """
-        login = LoginPage(driver)
-        login.load()
-        login.login(config["email"], config["password"])
 
-        shop = ShopPage(driver)
-        shop.load()
-        shop.handle_age_verification("08-08-2008")
+def test_age_verification_empty_date(driver):
+    driver.get(AUTH_URL)
 
-        assert shop.toast_message_displayed("underage")
+    login_page = LoginPage(driver)
+    login_page.login(TEST_USER_CREDENTIALS["email"], TEST_USER_CREDENTIALS["password"])
 
-    def test_valid_dob_grants_access(self, driver, config):
-        """
-        A valid DOB (18+) should allow access without any error toasts.
-        """
-        login = LoginPage(driver)
-        login.load()
-        login.login(config["email"], config["password"])
+    shopping_page = ShopPage(driver)
+    shopping_page.open_shop_modal()
+    shopping_page.handle_age_verification("")  # empty DOB
 
-        shop = ShopPage(driver)
-        shop.load()
-        shop.handle_age_verification("01-01-2000")
+    assert "Please enter your birth date" in shopping_page.get_toast_message()
 
-        assert not shop.toast_message_displayed("underage")
-        assert not shop.toast_message_displayed("birth")
+
+def test_age_verification_invalid_format(driver):
+    driver.get(AUTH_URL)
+
+    login_page = LoginPage(driver)
+    login_page.login(TEST_USER_CREDENTIALS["email"], TEST_USER_CREDENTIALS["password"])
+
+    shopping_page = ShopPage(driver)
+    shopping_page.open_shop_modal()
+    shopping_page.handle_age_verification(INVALID_DOB)  # e.g. "1999/01/01"
+
+    assert "Please enter your birth date" in shopping_page.get_toast_message()

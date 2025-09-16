@@ -1,0 +1,57 @@
+# Python cache / compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# IDE/editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS junk
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs and reports
+*.log
+*.out
+*.err
+report.html
+*.pytest_cache/
+*.coverage
+coverage.xml
+htmlcov/
+
+# Environment files
+.env
+.env.*
+
+# Selenium / ChromeDriver stuff
+*.pid
+*.sock
+chromedriver
+chromedriver.exe
+
+# Test outputs
+screenshots/
+reports/
+allure-results/
+allure-report/
+junit-xml/
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Node (if you later add frontend tests)
+node_modules/
+

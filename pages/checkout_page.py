@@ -1,139 +1,76 @@
-import time  # For adding delays during UI interactions
-from selenium.webdriver.common.by import By  # Used to locate elements
-from selenium.webdriver.support.ui import WebDriverWait  # Waits for conditions
-from selenium.webdriver.support import expected_conditions as EC  # Common wait conditions
-
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from config import DEFAULT_TIMEOUT, TEST_CHECKOUT_DATA
 
 class CheckoutPage:
-    """Handles checkout flow: shipping-cost reads, quantity adjustments, and full purchases."""
+    def __init__(self, driver):
+        self.driver = driver
 
-    # — existing shipping-cost locators & actions —
-    _CHECKOUT_URL = "https://grocerymate.masterschool.com/checkout"  # URL for the checkout page
-    _SHIPPING_COST = (
-        By.XPATH,
-        ".//h5[normalize-space(.)='Shipment:']/following-sibling::h5"
-    )  # Finds the element with shipping cost
-    _PLUS_BUTTON = (By.XPATH, "//button[contains(@class, 'plus')]"), "button.plus"  # Locator for increasing quantity
-    _MINUS_BUTTON = (By.XPATH, "//button[contains(@class, 'minus')]") # Locator for decreasing quantity
+        # Locators
+        self.street_address = (By.XPATH, "//input[@placeholder='Street Address']")
+        self.city = (By.XPATH, "//input[@placeholder='City']")
+        self.postal_code = (By.XPATH, "//input[@placeholder='Postal Code']")
+        self.card_number = (By.XPATH, "//input[@placeholder='Card number']")
+        self.card_name = (By.XPATH, "//input[@placeholder='Name on card']")
+        self.card_expiry = (By.XPATH, "//input[@placeholder='Expiration']")
+        self.card_cvc = (By.XPATH, "//input[@placeholder='Cvv']")
+        self.buy_now_button = (By.XPATH, "//button[text()='Buy now']")
 
-    # — updated locators for the “buy” flow —
-    _STREET = (By.NAME, "street")  # Input field for street
-    _CITY = (By.NAME, "city")  # Input field for city
-    _POSTAL_CODE = (By.NAME, "postalCode")  # Input for ZIP code
-    _CARD_NUMBER = (By.NAME, "cardNumber")  # Credit card number input
-    _NAME_ON_CARD = (By.NAME, "nameOnCard")  # Name on card input
-    _EXPIRATION = (By.NAME, "expiration")  # Expiry date input
-    _CVV = (By.NAME, "cvv")  # CVV code input
-    _CONTINUE = (By.XPATH, "//button[contains(text(),'Buy now')]")  # Final purchase button
+    def _wait_and_send_keys(self, locator, text, timeout=DEFAULT_TIMEOUT):
+        """Wait for element to be present and type text into it."""
+        WebDriverWait(self.driver, timeout).until(EC.presence_of_element_located(locator)).send_keys(text)
 
-    # — locators for cart cleanup —
-    _REMOVE_LINKS = (By.CSS_SELECTOR, "a.remove-icon")  # Fix: <a> tag, not button
-    _CART_EMPTY_INDICATOR = (By.CLASS_NAME, "cart-empty-text")  # Optional final check
+    def _wait_and_click(self, locator, timeout=DEFAULT_TIMEOUT):
+        """Wait for element to be clickable and click it."""
+        WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable(locator)).click()
 
-    def __init__(self, driver, timeout: int = 15):
-        self.driver = driver  # Store reference to Selenium driver
-        self.wait = WebDriverWait(driver, timeout)  # Create WebDriverWait with timeout
+    # --- Checkout actions ---
+    def enter_checkout_details(self, street, city, zip_code, card_number, name_on_card, expiry, cvc):
+        """Fill in the checkout form."""
+        self._wait_and_send_keys(self.street_address, street)
+        self._wait_and_send_keys(self.city, city)
+        self._wait_and_send_keys(self.postal_code, zip_code)
+        self._wait_and_send_keys(self.card_number, card_number)
+        self._wait_and_send_keys(self.card_name, name_on_card)
+        self._wait_and_send_keys(self.card_expiry, expiry)
+        self._wait_and_send_keys(self.card_cvc, cvc)
 
-    # — shipping-cost & quantity methods —
-    def open_checkout(self):
-        """Navigate directly to the checkout page and wait for React to render."""
-        self.driver.get(self._CHECKOUT_URL)  # Go to checkout URL
-        self.wait.until(EC.url_contains("/checkout"))  # Wait until URL confirms we’re there
-        time.sleep(1)  # Allow hydration/render time for React
+    def click_buy_now(self):
+        """Click the 'Buy now' button."""
+        self._wait_and_click(self.buy_now_button)
 
-    def read_shipping_cost(self) -> str:
-        """Wait for and return the visible shipping-cost text."""
-        el = self.wait.until(EC.visibility_of_element_located(self._SHIPPING_COST))  # Wait for cost to show
-        return el.text.strip()  # Return cleaned text
-
-    def increase_quantity(self, times: int = 1):
-        """Click the '+' button `times` times, with a pause after each."""
-        btn = self.wait.until(EC.element_to_be_clickable(self._PLUS_BUTTON))  # Wait until plus button is clickable
-        for _ in range(times):  # Repeat clicking
-            btn.click()
-            time.sleep(0.5)  # Small delay to let UI update
-
-    def decrease_quantity(self, times: int = 1):
-        """Click the '–' button `times` times, with a pause after each."""
-        btn = self.wait.until(EC.element_to_be_clickable(self._MINUS_BUTTON))  # Wait until minus button is clickable
-        for _ in range(times):  # Repeat clicking
-            btn.click()
-            time.sleep(0.5)  # Delay between actions
-
-    # — purchase (“buy”) methods —
-    def fill_checkout_form(
-        self,
-        first: str = "Test",
-        last: str = "User",
-        address: str = "123 Test St",
-        city: str = "Testville",
-        zip_code: str = "10001",
-    ) -> None:
-        """Fill the checkout form and place the order."""
-        self.wait.until(EC.presence_of_element_located(self._STREET)).send_keys(address)  # Fill street
-        self.wait.until(EC.presence_of_element_located(self._CITY)).send_keys(city)  # Fill city
-        self.wait.until(EC.presence_of_element_located(self._POSTAL_CODE)).send_keys(zip_code)  # Fill ZIP
-        self.wait.until(EC.presence_of_element_located(self._CARD_NUMBER)).send_keys("1111111111111112")  # Dummy card
-        self.wait.until(EC.presence_of_element_located(self._NAME_ON_CARD)).send_keys(f"{first} {last}")  # Name
-        self.wait.until(EC.presence_of_element_located(self._EXPIRATION)).send_keys("01/2027")  # Expiry date
-        self.wait.until(EC.presence_of_element_located(self._CVV)).send_keys("123")  # CVV code
-        self.driver.find_element(*self._CONTINUE).click()  # Click "Buy now"
-
-    def wait_for_order_confirmation(self):
-        """Wait until the app redirects to homepage (used as order confirmation)."""
-        self.wait.until(EC.url_to_be("https://grocerymate.masterschool.com/"))  # Wait for homepage load
-
-    def buy(
-        self,
-        first: str = "Test",
-        last: str = "User",
-        address: str = "1 Test Str",
-        city: str = "Testville",
-        zip_code: str = "10001",
-    ):
-        """
-        Full purchase helper: open checkout, fill the form, place order,
-        and wait for confirmation. Does not affect existing shipping tests.
-        """
-        self.open_checkout()  # Open checkout page
-        self.fill_checkout_form(  # Fill form with given values
-            first=first,
-            last=last,
-            address=address,
-            city=city,
-            zip_code=zip_code,
+    def complete_checkout_with_test_data(self):
+        """Fill checkout form with predefined test data and submit."""
+        self.enter_checkout_details(
+            street=TEST_CHECKOUT_DATA["street"],
+            city=TEST_CHECKOUT_DATA["city"],
+            zip_code=TEST_CHECKOUT_DATA["postcode"],
+            card_number=TEST_CHECKOUT_DATA["card_number"],
+            name_on_card=TEST_CHECKOUT_DATA["card_name"],
+            expiry=TEST_CHECKOUT_DATA["card_expiry"],
+            cvc=TEST_CHECKOUT_DATA["card_cvc"]
         )
-        self.wait_for_order_confirmation()  # Wait for homepage
+        self.click_buy_now()
 
-    def place_order(self):
-        """
-        Clicks the 'Buy now' or final submission button to place the order.
-        """
-        self.wait.until(EC.element_to_be_clickable(self._CONTINUE)).click()
+    # --- Shipping info ---
+    def get_shipping_cost(self):
+        """Return the displayed shipping cost."""
+        shipping_element = WebDriverWait(self.driver, DEFAULT_TIMEOUT).until(
+            EC.visibility_of_element_located((By.XPATH, "//div[@class='shipment-container']/h5[2]"))
+        )
+        return shipping_element.text.strip()
 
-    def clear_cart(self):
-        """
-        Clicks all '×' icons in the checkout to remove items from the cart.
-        """
-        self.driver.get(self._CHECKOUT_URL)
-        self.wait.until(EC.presence_of_element_located(self._REMOVE_LINKS))
-        time.sleep(2)  # Let cart render fully
+    def get_updated_shipping_after_refresh(self):
+        """Refresh page and return updated shipping cost."""
+        self.driver.refresh()
+        shipping_element = WebDriverWait(self.driver, DEFAULT_TIMEOUT).until(
+            EC.visibility_of_element_located((By.XPATH, "//h5[text()='Shipment:']/following-sibling::h5"))
+        )
+        return shipping_element.text.strip()
 
-        while True:
-            remove_buttons = self.driver.find_elements(*self._REMOVE_LINKS)
-            x_buttons = [btn for btn in remove_buttons if btn.text.strip() == "×"]
-
-            if not x_buttons:
-                print(" Cart is empty.")
-                break
-
-            for button in x_buttons:
-                try:
-                    self.wait.until(EC.element_to_be_clickable(button))
-                    self.driver.execute_script("arguments[0].scrollIntoView(true);", button)
-                    button.click()
-                    time.sleep(2)
-                    break
-                except Exception as e:
-                    print(f" Failed to click '×': {e}")
-                    continue
+    # --- Cart actions ---
+    def click_minus_button_multiple_times(self, times):
+        """Click the minus button in the cart multiple times."""
+        for _ in range(times):
+            self._wait_and_click((By.XPATH, "//button[@class='minus']"))
