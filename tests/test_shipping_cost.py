@@ -31,6 +31,23 @@ def test_shipping_cost_threshold(driver, config):
     # Step 2: Complete age verification flow
     shopping_page = ShopPage(driver)
     shopping_page.open_store()  # Navigate to store and wait for page/modal
+    
+    # Wait until overlay is gone        
+    overlay_xpath = "//div[@class='modal-overlay']"
+    WebDriverWait(driver, 10).until(
+        EC.invisibility_of_element_located((By.XPATH, overlay_xpath))
+    )
+
+    # Now click safely
+    add_to_cart_button = wait.until(       
+        EC.element_to_be_clickable((By.XPATH, "//img[@alt='Gala Apples']/ancestor::div[@class='card']//button[contains(text(), 'Add to Cart')]"))
+    )
+    add_to_cart_button.click()    
+
+    
+
+
+
     shopping_page.handle_age_verification("01-01-2000")
     wait.until(EC.url_contains("/store"))  # Wait for URL to confirm we're on the store page
 
