@@ -34,8 +34,8 @@ INVALID_DOB = "32-12-2005"
 
 #items
 TEST_PRODUCTS = {
-    "rating_product": "Ginger",
-    "shipping_product": "Ginger",
+    "rating_product": "Cherries",
+    "shipping_product": "Cherries",
     "cheap_product": "Kale"
 
 }

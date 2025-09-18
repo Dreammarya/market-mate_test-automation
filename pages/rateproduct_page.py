@@ -8,88 +8,70 @@ from config import STORE_URL
 class RatingPage:
     def __init__(self, driver):
         self.driver = driver
-        self.wait = WebDriverWait(driver, 10)
 
     def open_product_from_shop(self, product_name):
-        """Open the shop and navigate to a specific product by its image alt attribute."""
         self.driver.get(STORE_URL)
         open_shop_and_handle_dob(self.driver)
 
-        # wait until overlay disappears (if present)
-        self._wait_for_overlay_to_disappear()
-
-        # click on product image (by alt text)
-        product = self.wait.until(
+        WebDriverWait(self.driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, f"//img[@alt='{product_name}']"))
-        )
-        product.click()
+        ).click()
 
     def delete_existing_rating_if_exists(self):
-        """Delete an existing rating if one is already present."""
         try:
-            menu_icon = self.wait.until(
+            WebDriverWait(self.driver, 3).until(
                 EC.element_to_be_clickable((By.XPATH, "(//div[@class='comment']//div[@class='menu-icon'])[1]"))
-            )
-            menu_icon.click()
-
-            delete_button = self.wait.until(
+            ).click()
+            WebDriverWait(self.driver, 3).until(
                 EC.element_to_be_clickable((By.XPATH, "//div[@class='dropdown-menu']//button[text()='Delete']"))
-            )
-            delete_button.click()
+            ).click()
 
-            # handle confirmation alert
+            # Handle the alert that appears
             WebDriverWait(self.driver, 5).until(EC.alert_is_present())
             alert = self.driver.switch_to.alert
             alert.accept()
-            print("Existing review deleted.")
-        except Exception:
-            print("No existing review found.")
+            print("Alert accepted – review deleted.")
+        except:
+            print("No review to delete or alert was not displayed.")
 
-    def rate_product(self, stars: int):
-        """Click on a star rating (1–5)."""
-        self._wait_for_overlay_to_disappear()
+    def rate_product(self, stars):
         xpath = f"//div[@class='interactive-rating']//span[contains(@class, 'star')][{stars}]"
-        star = self.wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
-        star.click()
+        WebDriverWait(self.driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, xpath))
+        ).click()
 
     def submit_review(self):
-        """Click the submit button for a review."""
-        self._wait_for_overlay_to_disappear()
-        submit_button = self.wait.until(
+        WebDriverWait(self.driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'new-review-btn-send')]"))
-        )
-        submit_button.click()
+        ).click()
 
     def verify_rating_success_message(self):
-        """Verify that a success message is shown after submitting a review."""
         try:
-            self.wait.until(
+            WebDriverWait(self.driver, 5).until(
                 EC.visibility_of_element_located((
                     By.XPATH,
                     "//p[contains(text(), 'You have already reviewed this product')]"
                 ))
             )
-            print("Rating submitted – success message displayed.")
-        except Exception:
-            raise AssertionError("No success message found after submitting rating.")
+            print("Rating submitted – a message indicating the review was already submitted is displayed.")
+        except:
+            raise AssertionError("No message indicating the rating was already submitted – something is wrong.")
 
-    def verify_error_message(self, expected_text: str):
-        """Verify that the expected error message is displayed."""
-        try:
-            xpath = f'//*[contains(text(), "{expected_text}")]'
-            error_element = self.wait.until(
-                EC.visibility_of_element_located((By.XPATH, xpath))
-            )
-            assert expected_text in error_element.text
-        except Exception:
-            raise AssertionError(f"Expected error message not found: '{expected_text}'")
+    def verify_error_message(self, expected_text):
+        xpath = f'//*[contains(text(), "{expected_text}")]'
+        locator = (By.XPATH, xpath)
+        element = self.wait_for_element(locator, timeout=5)
+        if element and expected_text in element.text:
+            return
+        raise AssertionError(f"The expected error message was not found: '{expected_text}'")
 
-    def _wait_for_overlay_to_disappear(self):
-        """Utility method: wait until modal overlay disappears before clicking."""
+    def close_cart_overlay_if_present(self):
         try:
-            WebDriverWait(self.driver, 5).until(
-                EC.invisibility_of_element_located((By.CLASS_NAME, "modal-overlay"))
+            overlay = WebDriverWait(self.driver, 2).until(
+                EC.presence_of_element_located((By.XPATH, "//div[contains(@class,'cart-modal')]"))
             )
-        except Exception:
-            # overlay not found or already gone → continue
-            pass
+            close_btn = overlay.find_element(By.XPATH, ".//button[contains(text(),'Close') or contains(text(),'×')]")
+            close_btn.click()
+            print("Closed cart overlay before rating.")
+        except TimeoutException:
+            pass  # no overlay

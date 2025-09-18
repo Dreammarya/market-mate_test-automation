@@ -1,79 +1,46 @@
-import math  # Used to calculate required quantity to exceed €20
-import time  # Used for sleep pauses between actions
-import pytest  # PyTest framework and decorators
-from selenium.webdriver.support.ui import WebDriverWait  # For explicit waits
-from selenium.webdriver.support import expected_conditions as EC  # For Selenium wait conditions
-
-# Import page modules
+import pytest
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from pages.login_page import LoginPage
 from pages.shopping_page import ShopPage
 from pages.checkout_page import CheckoutPage
-
+from config import TEST_USER_CREDENTIALS
 
 
 @pytest.mark.usefixtures("driver", "config")
-#@pytest.mark.xfail(reason="Shipping does not update to €5 when subtotal drops below €20")
 def test_shipping_cost_threshold(driver, config):
     """
-    Steps:
-    1. Log in
-    2. Pass age gate
-    3. Add enough quantity to exceed €20 → expect free shipping
-    4. Decrease quantity until subtotal is below €20 → expect €5 shipping
-    5. Clean up the cart
+    Verify that free shipping applies above €20,
+    and reverts to €5 when cart subtotal drops below €20.
     """
 
-    wait = WebDriverWait(driver, 30)  # General wait object
+    wait = WebDriverWait(driver, 15)
 
-    # Step 1: Log in and pass age gate
-    LoginPage(driver).login(config["email"], config["password"])
-
-    # Step 2: Complete age verification flow
+    # Step 1: Login and go to store
+    LoginPage(driver).login(TEST_USER_CREDENTIALS["email"], TEST_USER_CREDENTIALS["password"])
     shopping_page = ShopPage(driver)
-    shopping_page.open_store()  # Navigate to store and wait for page/modal
-    
-    # Wait until overlay is gone        
-    overlay_xpath = "//div[@class='modal-overlay']"
-    WebDriverWait(driver, 10).until(
-        EC.invisibility_of_element_located((By.XPATH, overlay_xpath))
-    )
-
-    # Now click safely
-    add_to_cart_button = wait.until(       
-        EC.element_to_be_clickable((By.XPATH, "//img[@alt='Gala Apples']/ancestor::div[@class='card']//button[contains(text(), 'Add to Cart')]"))
-    )
-    add_to_cart_button.click()    
-
-    
-
-
-
+    shopping_page.open_store()
     shopping_page.handle_age_verification("01-01-2000")
-    wait.until(EC.url_contains("/store"))  # Wait for URL to confirm we're on the store page
 
-    # Step 3: Calculate how many items are needed to exceed €20
-    shopping_page.open_store()  # Navigate to the store
-    unit_price = shopping_page.get_first_product_price()  # Get price of first visible item
-    qty = math.floor(30 / unit_price) + 1  # Compute minimum quantity to exceed €20
+    # Step 2: Add products until subtotal > €20
+    unit_price = shopping_page.get_first_product_price()
+    qty_needed = (20 // unit_price) + 2  # add buffer above 20€
+    shopping_page.add_first_product_to_cart(qty_needed)
 
-    # Step 4: Add calculated quantity of product to cart
-    shopping_page.add_first_product_to_cart(qty)  # Add that quantity to the cart
-    time.sleep(2)  # Allow time for cart update
-
-    # Step 5: Assert shipping cost is free
+    # Step 3: Check free shipping
     checkout = CheckoutPage(driver)
-    checkout.open_checkout()  # Navigate to checkout page
-    shipping = checkout.read_shipping_cost()  # Read current shipping cost
-    assert "0" in shipping or "Free" in shipping, f"Expected free shipping, got: {shipping}"
-
-    # Step 6: Remove 1 item at a time until subtotal < €20
-    while unit_price * qty >= 20:
-        checkout.decrease_quantity()  # Click "-" button once
-        qty -= 1  # Adjust tracked quantity down
-
-    # Step 7: Check that shipping cost is now €5
+    checkout.open_checkout()
     shipping = checkout.read_shipping_cost()
-    assert "5" in shipping or "5.00" in shipping, f"Expected €5 shipping, got: {shipping}"  # This assert is known to fail
+    assert "0" in shipping or "Free" in shipping, f"❌ Expected free shipping, got: {shipping}"
 
-    # Step 8: Cleanup - remove all items from cart
+    # Step 4: Reduce quantity until subtotal < 20
+    while checkout.get_subtotal_amount() >= 20:
+        checkout.decrease_quantity()
+
+    # Step 5: Verify shipping is €5
+    shipping = checkout.read_shipping_cost()
+    assert "5" in shipping or "5.00" in shipping, f"❌ Expected €5 shipping, got: {shipping}"
+
+    # Step 6: Cleanup
     checkout.clear_cart()

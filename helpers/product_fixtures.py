@@ -22,7 +22,10 @@ def purchase_product_once(driver):
     driver.get(AUTH_URL)
 
     # Log in with test credentials
-    LoginPage(driver).login(TEST_USER_CREDENTIALS)
+    LoginPage(driver).login(
+    TEST_USER_CREDENTIALS["email"],
+    TEST_USER_CREDENTIALS["password"]
+)
 
     # Open the store
     WebDriverWait(driver, 10).until(

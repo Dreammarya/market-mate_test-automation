@@ -1,6 +1,7 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 
 
 class LoginPage:
@@ -33,3 +34,4 @@ class LoginPage:
 
         # wait until shop page link appears (successful login)
         self.wait.until(EC.presence_of_element_located(self._SHOP_BUTTON))
+    
