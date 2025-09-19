@@ -1,6 +1,7 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from helpers.cart_utils import open_shop_and_handle_dob
 from config import STORE_URL
 
@@ -8,6 +9,7 @@ from config import STORE_URL
 class RatingPage:
     def __init__(self, driver):
         self.driver = driver
+        self.wait = WebDriverWait(driver, 10)   # ✅ added for reuse
 
     def open_product_from_shop(self, product_name):
         self.driver.get(STORE_URL)
@@ -26,10 +28,8 @@ class RatingPage:
                 EC.element_to_be_clickable((By.XPATH, "//div[@class='dropdown-menu']//button[text()='Delete']"))
             ).click()
 
-            # Handle the alert that appears
             WebDriverWait(self.driver, 5).until(EC.alert_is_present())
-            alert = self.driver.switch_to.alert
-            alert.accept()
+            self.driver.switch_to.alert.accept()
             print("Alert accepted – review deleted.")
         except:
             print("No review to delete or alert was not displayed.")
@@ -53,17 +53,20 @@ class RatingPage:
                     "//p[contains(text(), 'You have already reviewed this product')]"
                 ))
             )
-            print("Rating submitted – a message indicating the review was already submitted is displayed.")
+            print("Rating submitted – already reviewed message is displayed.")
         except:
-            raise AssertionError("No message indicating the rating was already submitted – something is wrong.")
+            raise AssertionError("No message indicating rating was submitted – something is wrong.")
 
     def verify_error_message(self, expected_text):
-        xpath = f'//*[contains(text(), "{expected_text}")]'
-        locator = (By.XPATH, xpath)
-        element = self.wait_for_element(locator, timeout=5)
-        if element and expected_text in element.text:
-            return
-        raise AssertionError(f"The expected error message was not found: '{expected_text}'")
+        # ✅ fixed: removed missing wait_for_element, replaced with standard wait
+        try:
+            xpath = f'//*[contains(text(), "{expected_text}")]'
+            element = WebDriverWait(self.driver, 5).until(
+                EC.visibility_of_element_located((By.XPATH, xpath))
+            )
+            assert expected_text in element.text
+        except:
+            raise AssertionError(f"The expected error message was not found: '{expected_text}'")
 
     def close_cart_overlay_if_present(self):
         try:
@@ -74,4 +77,4 @@ class RatingPage:
             close_btn.click()
             print("Closed cart overlay before rating.")
         except TimeoutException:
-            pass  # no overlay
+            pass
